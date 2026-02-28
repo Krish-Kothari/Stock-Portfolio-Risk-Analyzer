@@ -1,5 +1,5 @@
 # Stock-Portfolio-Risk-Analyzer
-PortfolioRisk Lens: A web-based platform that empowers retail investors to understand and quantify portfolio risk through professional-grade analytics and interactive simulations.
+**PortfolioRisk Lens**: A web-based platform that empowers retail investors to understand and quantify portfolio risk through professional-grade analytics and interactive simulations.
 
 # 1. Problem Statement
 # Problem Title
