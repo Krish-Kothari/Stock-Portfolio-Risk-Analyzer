@@ -1,0 +1,876 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>volt · portfolio risk analyzer</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Space Grotesk', sans-serif;
+        }
+
+        body {
+            background-color: #0c0f15;
+            color: #eaeef2;
+            line-height: 1.5;
+            padding: 2rem;
+        }
+
+        .glass {
+            background: rgba(20, 28, 36, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(0, 255, 200, 0.15);
+            border-radius: 28px;
+            box-shadow: 0 25px 40px -15px rgba(0, 0, 0, 0.6);
+        }
+
+        .app {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 2rem;
+        }
+
+        .logo-icon {
+            background: linear-gradient(145deg, #00ffc6, #9f7afe);
+            width: 48px;
+            height: 48px;
+            border-radius: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 1.8rem;
+            color: #0c0f15;
+            box-shadow: 0 0 20px #00ffc680;
+        }
+
+        .logo h1 {
+            font-weight: 600;
+            font-size: 2rem;
+            letter-spacing: -0.02em;
+            background: linear-gradient(120deg, #ffffff, #b0f0ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .logo span {
+            background: #ff4d6d;
+            color: #0c0f15;
+            font-size: 0.8rem;
+            font-weight: 600;
+            padding: 0.2rem 0.8rem;
+            border-radius: 40px;
+            margin-left: 12px;
+            text-transform: uppercase;
+        }
+
+        .input-panel {
+            padding: 1.8rem 2rem;
+            margin-bottom: 2rem;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: flex-end;
+            gap: 2rem;
+        }
+
+        .ticker-list {
+            flex: 3;
+            min-width: 500px;
+        }
+
+        .ticker-row {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 12px;
+            align-items: center;
+        }
+
+        .ticker-row input {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid #2e3a44;
+            border-radius: 40px;
+            padding: 12px 18px;
+            color: white;
+            font-size: 1rem;
+            transition: all 0.2s;
+        }
+
+        .ticker-row input:focus {
+            border-color: #00ffc6;
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(0, 255, 198, 0.2);
+        }
+
+        .ticker-symbol {
+            width: 130px;
+        }
+
+        .ticker-weight {
+            width: 100px;
+        }
+
+        .remove-btn {
+            background: none;
+            border: none;
+            color: #ff8a9f;
+            font-size: 1.4rem;
+            cursor: pointer;
+            padding: 0 8px;
+        }
+
+        .add-btn {
+            background: rgba(0, 255, 198, 0.1);
+            border: 1.5px dashed #00ffc6;
+            border-radius: 40px;
+            padding: 10px 24px;
+            color: #00ffc6;
+            font-weight: 600;
+            cursor: pointer;
+            transition: 0.2s;
+            margin-top: 8px;
+        }
+
+        .add-btn:hover {
+            background: #00ffc6;
+            color: #0c0f15;
+        }
+
+        .action-buttons {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .primary-btn,
+        .secondary-btn {
+            padding: 14px 24px;
+            border-radius: 50px;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: 0.2s;
+        }
+
+        .primary-btn {
+            background: linear-gradient(145deg, #00ffc6, #9f7afe);
+            color: #0c0f15;
+            box-shadow: 0 6px 14px rgba(0, 255, 200, 0.3);
+        }
+
+        .primary-btn:hover {
+            transform: scale(1.02);
+            box-shadow: 0 10px 20px #00ffc670;
+        }
+
+        .secondary-btn {
+            background: transparent;
+            border: 2px solid #ff4d6d;
+            color: #ff4d6d;
+        }
+
+        .secondary-btn:hover {
+            background: #ff4d6d20;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 6px;
+            margin: 2rem 0 1rem;
+            flex-wrap: wrap;
+        }
+
+        .tab {
+            padding: 12px 28px;
+            background: rgba(30, 40, 50, 0.7);
+            border-radius: 60px;
+            font-weight: 500;
+            color: #b0c4d9;
+            cursor: pointer;
+            border: 1px solid transparent;
+            transition: 0.2s;
+        }
+
+        .tab.active {
+            background: #1f2e3a;
+            border-color: #00ffc6;
+            color: white;
+            box-shadow: 0 0 12px #00ffc640;
+        }
+
+        .tab:hover {
+            background: #25333f;
+        }
+
+        .content-card {
+            padding: 2rem;
+            margin-bottom: 2.5rem;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .metric-item {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 24px;
+            padding: 1.4rem;
+            border-left: 4px solid #00ffc6;
+        }
+
+        .metric-label {
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: #90a4b9;
+        }
+
+        .metric-value {
+            font-size: 2rem;
+            font-weight: 600;
+            color: #fff;
+        }
+
+        .metric-unit {
+            font-size: 0.9rem;
+            color: #7f8fa3;
+        }
+
+        .table-wrapper {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th {
+            text-align: left;
+            padding: 1rem 0.5rem;
+            color: #00ffc6;
+            font-weight: 500;
+            border-bottom: 1px solid #2e444e;
+        }
+
+        td {
+            padding: 0.8rem 0.5rem;
+            border-bottom: 1px solid #1e2f38;
+        }
+
+        .badge {
+            background: #ff4d6d;
+            color: #0c0f15;
+            border-radius: 30px;
+            padding: 0.2rem 0.9rem;
+            font-weight: 600;
+            font-size: 0.8rem;
+            display: inline-block;
+        }
+
+        .chart-container {
+            height: 300px;
+            margin-top: 2rem;
+        }
+
+        .flex-row {
+            display: flex;
+            gap: 2rem;
+            flex-wrap: wrap;
+        }
+
+        .shock-row {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            margin: 1rem 0;
+        }
+
+        .shock-input {
+            background: #1b262d;
+            border: 1px solid #314956;
+            border-radius: 30px;
+            padding: 10px 16px;
+            color: white;
+            width: 120px;
+        }
+
+        .error-msg {
+            color: #ff8a9f;
+            background: #ff4d6d20;
+            border-radius: 30px;
+            padding: 12px 20px;
+        }
+
+        .positive {
+            color: #00ffc6;
+            font-weight: 600;
+        }
+
+        .negative {
+            color: #ff4d6d;
+            font-weight: 600;
+        }
+
+        .scenario-desc {
+            color: #b0c4d9;
+            font-size: 0.9rem;
+            margin: 5px 0 15px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="app">
+        <div class="logo">
+            <div class="logo-icon">📈</div>
+            <h1>volt. <span>risk analyzer</span></h1>
+        </div>
+
+        <!-- portfolio input panel -->
+        <div class="glass input-panel">
+            <div class="ticker-list" id="tickerList">
+                <div class="ticker-row" id="rowTemplate" style="display: none;">
+                    <input class="ticker-symbol" placeholder="AAPL" value="AAPL">
+                    <input class="ticker-weight" placeholder="weight" value="0.5" step="0.01" min="0" max="1">
+                    <button class="remove-btn" onclick="removeRow(this)">✕</button>
+                </div>
+            </div>
+            <div class="action-buttons">
+                <button class="primary-btn" onclick="addTickerRow()">+ add asset</button>
+                <button class="secondary-btn" onclick="validateTickers()">✓ validate</button>
+                <button class="primary-btn" onclick="loadFullAnalysis()"
+                    style="background: linear-gradient(145deg,#ff4d6d,#ff8a9f);">🔥 analyze</button>
+            </div>
+        </div>
+
+        <!-- tabs navigation -->
+        <div class="tabs">
+            <div class="tab active" data-tab="overview" onclick="switchTab('overview')">📊 overview</div>
+            <div class="tab" data-tab="correlation" onclick="switchTab('correlation')">🔗 correlation</div>
+            <div class="tab" data-tab="montecarlo" onclick="switchTab('montecarlo')">🌀 monte carlo</div>
+            <div class="tab" data-tab="scenario" onclick="switchTab('scenario')">⚡ scenario</div>
+            <div class="tab" data-tab="stress" onclick="switchTab('stress')">🧪 stress + future</div>
+        </div>
+
+        <!-- global message -->
+        <div id="globalMessage" class="error-msg" style="display: none;"></div>
+
+        <!-- OVERVIEW TAB -->
+        <div id="overview" class="tab-content">
+            <div class="glass content-card">
+                <h2 style="margin-bottom: 1.5rem; color:#00ffc6;">📋 portfolio summary</h2>
+                <div class="metrics-grid" id="summaryMetrics"></div>
+            </div>
+            <div class="glass content-card">
+                <h2 style="margin-bottom: 1.5rem;">📉 var & risk metrics</h2>
+                <div class="metrics-grid" id="varMetrics"></div>
+            </div>
+            <div class="glass content-card">
+                <h2 style="margin-bottom: 1.5rem;">🏆 performance & benchmark</h2>
+                <div class="flex-row">
+                    <div style="flex:2" id="perfRatios"></div>
+                    <div style="flex:1" id="benchmarkInfo"></div>
+                </div>
+            </div>
+            <div class="glass content-card">
+                <h2>📈 cumulative performance (history)</h2>
+                <div class="chart-container">
+                    <canvas id="historyChart"></canvas>
+                </div>
+            </div>
+            <div class="glass content-card">
+                <h2>🧩 individual asset risk</h2>
+                <div class="table-wrapper" id="individualRiskTable"></div>
+            </div>
+        </div>
+
+        <!-- CORRELATION TAB -->
+        <div id="correlation" class="tab-content" style="display: none;">
+            <div class="glass content-card">
+                <h2 style="margin-bottom: 1.5rem;">🔗 correlation matrix</h2>
+                <div class="table-wrapper" id="correlationMatrix"></div>
+            </div>
+            <div class="glass content-card">
+                <h2 style="margin-bottom: 1.5rem;">📊 covariance matrix</h2>
+                <div class="table-wrapper" id="covarianceMatrix"></div>
+            </div>
+        </div>
+
+        <!-- MONTE CARLO TAB -->
+        <div id="montecarlo" class="tab-content" style="display: none;">
+            <div class="glass content-card">
+                <h2>🌀 monte carlo simulation</h2>
+                <div style="display: flex; gap: 20px; align-items: center; margin: 20px 0; flex-wrap:wrap;">
+                    <label>simulations: <input type="number" id="mcSims" value="5000" min="1000" max="20000" step="1000"
+                            style="background:#1f2e3a; border: none; color:white; padding:8px; border-radius:20px;"></label>
+                    <label>days: <input type="number" id="mcDays" value="252" min="60" max="504"
+                            style="background:#1f2e3a; border: none; color:white; padding:8px; border-radius:20px;"></label>
+                    <label>investment ₹: <input type="number" id="mcInvest" value="100000"
+                            style="background:#1f2e3a; border: none; color:white; padding:8px; border-radius:20px;"></label>
+                    <button class="primary-btn" onclick="runMonteCarlo()">run simulation</button>
+                </div>
+                <div class="chart-container">
+                    <canvas id="mcChart"></canvas>
+                </div>
+                <div class="metrics-grid" id="mcStats" style="margin-top: 20px;"></div>
+            </div>
+        </div>
+
+        <!-- SCENARIO TAB (shock analysis) -->
+        <div id="scenario" class="tab-content" style="display: none;">
+            <div class="glass content-card">
+                <h2>⚡ what‑if shocks</h2>
+                <div id="shockInputs"></div>
+                <button class="primary-btn" onclick="runShockAnalysis()" style="margin: 20px 0;">apply shocks</button>
+                <div class="flex-row" id="shockResults"></div>
+            </div>
+        </div>
+
+        <!-- STRESS TEST TAB (with future predictions) -->
+        <div id="stress" class="tab-content" style="display: none;">
+            <div class="glass content-card">
+                <h2>🧪 historical & future stress tests</h2>
+                <select id="scenarioSelect"
+                    style="background:#1f2e3a; color:white; padding:12px 20px; border-radius:40px; margin:20px 0; border:1px solid #00ffc6; min-width:300px;"></select>
+                <button class="primary-btn" onclick="runStressTest()">run stress test</button>
+                <div id="stressResults" style="margin-top: 30px;"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ---------- CONFIG ----------
+        const BACKEND_URL = window.location.protocol === 'file:' ? "http://127.0.0.1:5000" : "";
+
+        // ---------- GLOBAL STATE ----------
+        let holdings = [
+            { ticker: "AAPL", weight: 0.4 },
+            { ticker: "MSFT", weight: 0.3 },
+            { ticker: "GOOGL", weight: 0.3 }
+        ];
+
+        // Scenario metadata (for display only - actual data comes from backend)
+        const SCENARIO_META = {
+            "2008_crisis": { name: "2008 Financial Crisis", description: "Global financial meltdown triggered by subprime mortgage collapse", group: "historical" },
+            "covid_crash": { name: "COVID-19 Crash (2020)", description: "Rapid market sell-off due to global pandemic", group: "historical" },
+            "dot_com_bust": { name: "Dot-Com Bust (2000-2002)", description: "Technology bubble collapse", group: "historical" },
+            "2022_bear": { name: "2022 Bear Market", description: "Interest rate hikes and inflation-driven sell-off", group: "historical" },
+            "future_pandemic": { name: "Future Pandemic", description: "Travel & energy drop, healthcare & tech resilient", group: "future" },
+            "ai_boom": { name: "AI Revolution", description: "Tech surges, energy lags, automation boom", group: "future" },
+            "rate_cut_rally": { name: "Rate Cut Rally", description: "Growth stocks rally, utilities flat", group: "future" }
+        };
+
+        // Chart instances to avoid duplicates
+        let historyChartInstance = null;
+        let mcChartInstance = null;
+
+        // ---------- INIT ----------
+        window.onload = function () {
+            renderTickerRows();
+            populateScenarioDropdown();
+            switchTab('overview');
+        };
+
+        function populateScenarioDropdown() {
+            const select = document.getElementById("scenarioSelect");
+            select.innerHTML = "";
+
+            const historicalGroup = document.createElement("optgroup");
+            historicalGroup.label = "📜 Historical Scenarios";
+            const futureGroup = document.createElement("optgroup");
+            futureGroup.label = "🔮 Future Predictions";
+
+            Object.entries(SCENARIO_META).forEach(([key, meta]) => {
+                const option = document.createElement("option");
+                option.value = key;
+                option.textContent = meta.name;
+                if (meta.group === "historical") historicalGroup.appendChild(option);
+                else futureGroup.appendChild(option);
+            });
+
+            select.appendChild(historicalGroup);
+            select.appendChild(futureGroup);
+        }
+
+        // ---------- TICKER ROWS ----------
+        function renderTickerRows() {
+            const container = document.getElementById("tickerList");
+            // remove existing rows except template
+            container.querySelectorAll('.ticker-row:not([id="rowTemplate"])').forEach(el => el.remove());
+            holdings.forEach((h) => {
+                const row = createRowFromTemplate(h.ticker, h.weight);
+                container.appendChild(row);
+            });
+        }
+
+        function createRowFromTemplate(ticker, weight) {
+            const template = document.getElementById("rowTemplate");
+            const newRow = template.cloneNode(true);
+            newRow.style.display = "flex";
+            newRow.removeAttribute("id");
+            const inputs = newRow.querySelectorAll('input');
+            inputs[0].value = ticker;
+            inputs[1].value = weight;
+            return newRow;
+        }
+
+        function addTickerRow() {
+            const container = document.getElementById("tickerList");
+            const row = createRowFromTemplate("", "");
+            container.appendChild(row);
+        }
+
+        function removeRow(btn) {
+            const row = btn.closest('.ticker-row');
+            if (document.querySelectorAll('.ticker-row:not([id="rowTemplate"])').length > 1) {
+                row.remove();
+            } else {
+                alert("keep at least one asset");
+            }
+        }
+
+        function getHoldingsFromUI() {
+            const rows = document.querySelectorAll('.ticker-row:not([id="rowTemplate"])');
+            const holdings = [];
+            rows.forEach(row => {
+                const ticker = row.querySelector('.ticker-symbol')?.value.trim().toUpperCase();
+                const weight = parseFloat(row.querySelector('.ticker-weight')?.value);
+                if (ticker && !isNaN(weight) && weight > 0) holdings.push({ ticker, weight });
+            });
+            // normalize weights to sum 1
+            const total = holdings.reduce((acc, h) => acc + h.weight, 0);
+            if (total > 0) {
+                holdings.forEach(h => h.weight = h.weight / total);
+            }
+            return holdings;
+        }
+
+        // ---------- API CALLS ----------
+        async function callApi(endpoint, body) {
+            const url = `${BACKEND_URL}${endpoint}`;
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'API error');
+            return data;
+        }
+
+        function showMessage(msg, isError = true) {
+            const el = document.getElementById('globalMessage');
+            el.style.display = 'block';
+            el.innerText = msg;
+            if (!isError) el.style.background = '#00ffc620';
+            setTimeout(() => el.style.display = 'none', 4000);
+        }
+
+        // validate tickers
+        async function validateTickers() {
+            const h = getHoldingsFromUI();
+            const tickers = h.map(x => x.ticker);
+            try {
+                const data = await callApi('/api/portfolio/validate', { tickers });
+                const invalid = data.invalid;
+                if (invalid.length === 0) showMessage('✅ all tickers valid', false);
+                else showMessage(`❌ invalid: ${invalid.join(', ')}`);
+            } catch (e) {
+                showMessage(e.message);
+            }
+        }
+
+        // main analysis
+        async function loadFullAnalysis() {
+            const h = getHoldingsFromUI();
+            if (h.length === 0) return showMessage('enter at least one holding');
+            holdings = h; // update global
+            try {
+                const metrics = await callApi('/api/risk/metrics', { holdings: h });
+                renderOverview(metrics);
+                // also load correlation and individual for their tabs
+                const corr = await callApi('/api/risk/correlation', { holdings: h });
+                renderCorrelation(corr);
+                const indiv = await callApi('/api/risk/individual', { holdings: h });
+                renderIndividualRisk(indiv.assets);
+                switchTab('overview');
+            } catch (e) {
+                showMessage(e.message);
+            }
+        }
+
+        function renderOverview(data) {
+            const s = data.portfolio_summary;
+            const r = data.return_metrics;
+            const risk = data.risk_metrics;
+            const varM = data.var_metrics;
+            const perf = data.performance_ratios;
+            const bench = data.benchmark_metrics;
+
+            document.getElementById('summaryMetrics').innerHTML = `
+            <div class="metric-item"><div class="metric-label">tickers</div><div class="metric-value">${s.tickers.join(', ')}</div></div>
+            <div class="metric-item"><div class="metric-label">investment</div><div class="metric-value">₹${s.investment_amount.toLocaleString()}</div></div>
+            <div class="metric-item"><div class="metric-label">ann. return</div><div class="metric-value">${r.annualized_return_pct}%</div></div>
+            <div class="metric-item"><div class="metric-label">ann. volatility</div><div class="metric-value">${risk.annualized_volatility_pct}%</div></div>
+            <div class="metric-item"><div class="metric-label">max drawdown</div><div class="metric-value">${risk.max_drawdown_pct}%</div></div>
+        `;
+
+            document.getElementById('varMetrics').innerHTML = `
+            <div class="metric-item"><div class="metric-label">historical VaR (95%)</div><div class="metric-value">${varM.historical_var_1d_pct}%</div><div class="metric-unit">₹${varM.historical_var_1d_dollar}</div></div>
+            <div class="metric-item"><div class="metric-label">parametric VaR</div><div class="metric-value">${varM.parametric_var_1d_pct}%</div></div>
+            <div class="metric-item"><div class="metric-label">historical CVaR</div><div class="metric-value">${varM.historical_cvar_1d_pct}%</div></div>
+            <div class="metric-item"><div class="metric-label">parametric CVaR</div><div class="metric-value">${varM.parametric_cvar_1d_pct}%</div></div>
+        `;
+
+            document.getElementById('perfRatios').innerHTML = `
+            <div><span class="badge">Sharpe</span> ${perf.sharpe_ratio}</div>
+            <div><span class="badge">Sortino</span> ${perf.sortino_ratio}</div>
+        `;
+            document.getElementById('benchmarkInfo').innerHTML = `
+            <div><span class="badge">beta</span> ${bench.beta}</div>
+            <div><span class="badge">alpha</span> ${bench.alpha_pct}%</div>
+        `;
+
+            // history chart
+            const hist = data.historical_performance;
+            if (historyChartInstance) historyChartInstance.destroy();
+            const ctx = document.getElementById('historyChart').getContext('2d');
+            historyChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: hist.dates.filter((_, i) => i % 20 === 0),
+                    datasets: [
+                        { label: 'portfolio', data: hist.portfolio.filter((_, i) => i % 20 === 0), borderColor: '#00ffc6', tension: 0.1, pointRadius: 0 },
+                        { label: 'benchmark', data: hist.benchmark.filter((_, i) => i % 20 === 0), borderColor: '#ff4d6d', tension: 0.1, pointRadius: 0 }
+                    ]
+                },
+                options: { responsive: true, maintainAspectRatio: false, backgroundColor: '#0c0f15' }
+            });
+        }
+
+        function renderCorrelation(data) {
+            const tickers = data.tickers;
+            const corr = data.correlation_matrix;
+            const cov = data.covariance_matrix;
+
+            let corrHtml = '<table><tr><th></th>';
+            tickers.forEach(t => corrHtml += `<th>${t}</th>`);
+            corrHtml += '</tr>';
+            corr.forEach((row, i) => {
+                corrHtml += `<tr><td><b>${tickers[i]}</b></td>`;
+                row.forEach(val => corrHtml += `<td>${val.toFixed(4)}</td>`);
+                corrHtml += '</tr>';
+            });
+            corrHtml += '</table>';
+            document.getElementById('correlationMatrix').innerHTML = corrHtml;
+
+            let covHtml = '<table><tr><th></th>';
+            tickers.forEach(t => covHtml += `<th>${t}</th>`);
+            covHtml += '</tr>';
+            cov.forEach((row, i) => {
+                covHtml += `<tr><td><b>${tickers[i]}</b></td>`;
+                row.forEach(val => covHtml += `<td>${val.toFixed(6)}</td>`);
+                covHtml += '</tr>';
+            });
+            covHtml += '</table>';
+            document.getElementById('covarianceMatrix').innerHTML = covHtml;
+        }
+
+        function renderIndividualRisk(assets) {
+            let html = '<table><tr><th>ticker</th><th>weight</th><th>ann.ret%</th><th>ann.vol%</th><th>VaR%</th><th>Sharpe</th><th>beta</th><th>maxDD%</th></tr>';
+            assets.forEach(a => {
+                html += `<tr><td>${a.ticker}</td><td>${(a.weight * 100).toFixed(1)}%</td><td>${a.annualized_return_pct}</td><td>${a.annualized_volatility_pct}</td><td>${a.historical_var_1d_pct}</td><td>${a.sharpe_ratio}</td><td>${a.beta}</td><td>${a.max_drawdown_pct}</td></tr>`;
+            });
+            html += '</table>';
+            document.getElementById('individualRiskTable').innerHTML = html;
+        }
+
+        // Monte Carlo
+        async function runMonteCarlo() {
+            const h = getHoldingsFromUI();
+            const num_simulations = parseInt(document.getElementById('mcSims').value);
+            const num_days = parseInt(document.getElementById('mcDays').value);
+            const investment_amount = parseFloat(document.getElementById('mcInvest').value);
+            try {
+                const data = await callApi('/api/simulate/monte-carlo', {
+                    holdings: h,
+                    num_simulations,
+                    num_days,
+                    investment_amount
+                });
+                renderMonteCarlo(data);
+            } catch (e) { showMessage(e.message); }
+        }
+
+        function renderMonteCarlo(data) {
+            const percentiles = data.percentile_paths;
+            const days = data.days;
+            if (mcChartInstance) mcChartInstance.destroy();
+            const ctx = document.getElementById('mcChart').getContext('2d');
+            mcChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: days,
+                    datasets: [
+                        { label: '5%', data: percentiles.p5, borderColor: '#ff4d6d', borderWidth: 2, pointRadius: 0, tension: 0.1 },
+                        { label: '25%', data: percentiles.p25, borderColor: '#ffb86b', borderWidth: 2, pointRadius: 0, tension: 0.1 },
+                        { label: '50%', data: percentiles.p50, borderColor: '#f1fa8c', borderWidth: 3, pointRadius: 0, tension: 0.1 },
+                        { label: '75%', data: percentiles.p75, borderColor: '#9f7afe', borderWidth: 2, pointRadius: 0, tension: 0.1 },
+                        { label: '95%', data: percentiles.p95, borderColor: '#00ffc6', borderWidth: 2, pointRadius: 0, tension: 0.1 }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    backgroundColor: '#0c0f15'
+                }
+            });
+
+            const stats = data.terminal_value_stats;
+            document.getElementById('mcStats').innerHTML = `
+            <div class="metric-item"><div class="metric-label">mean terminal</div><div class="metric-value">₹${stats.mean}</div></div>
+            <div class="metric-item"><div class="metric-label">median</div><div class="metric-value">₹${stats.median}</div></div>
+            <div class="metric-item"><div class="metric-label">95% tail</div><div class="metric-value">₹${stats.p5}</div></div>
+            <div class="metric-item"><div class="metric-label">prob loss</div><div class="metric-value">${data.probability_of_loss_pct}%</div></div>
+        `;
+        }
+
+        // Shock analysis
+        function renderShockInputs() {
+            const h = getHoldingsFromUI();
+            let html = '<div class="flex-row" style="gap:10px; flex-wrap:wrap;">';
+            h.forEach(asset => {
+                html += `<div class="shock-row">
+                <b>${asset.ticker}</b> shock %:
+                <input class="shock-input" id="shock_${asset.ticker}" type="number" value="-10" step="1">%
+            </div>`;
+            });
+            html += '</div>';
+            document.getElementById('shockInputs').innerHTML = html;
+        }
+
+        async function runShockAnalysis() {
+            const h = getHoldingsFromUI();
+            const shocks = {};
+            h.forEach(asset => {
+                const val = parseFloat(document.getElementById(`shock_${asset.ticker}`)?.value);
+                if (!isNaN(val)) shocks[asset.ticker] = val / 100;
+            });
+            try {
+                const data = await callApi('/api/scenario/shock', { holdings: h, shocks });
+                displayShockResults(data);
+            } catch (e) { showMessage(e.message); }
+        }
+
+        function displayShockResults(data) {
+            const before = data.before;
+            const after = data.after;
+            document.getElementById('shockResults').innerHTML = `
+            <div class="glass" style="flex:1; padding:1.5rem;">
+                <h3>before shock</h3>
+                <div>value ₹${before.portfolio_value}</div>
+                <div>ann ret ${before.annualized_return_pct}%</div>
+                <div>vol ${before.annualized_volatility_pct}%</div>
+                <div>VaR ${before.historical_var_1d_pct}%</div>
+            </div>
+            <div class="glass" style="flex:1; padding:1.5rem; border-left-color:#ff4d6d;">
+                <h3>after shock</h3>
+                <div>value ₹${after.portfolio_value}</div>
+                <div>change ₹${(after.portfolio_value - before.portfolio_value).toFixed(2)}</div>
+                <div>ann ret ${after.annualized_return_pct}%</div>
+                <div>vol ${after.annualized_volatility_pct}%</div>
+            </div>
+        `;
+        }
+
+        // Stress test
+        async function runStressTest() {
+            const h = getHoldingsFromUI();
+            const scenarioKey = document.getElementById('scenarioSelect').value;
+            try {
+                const data = await callApi('/api/scenario/stress-test', { holdings: h, scenario: scenarioKey });
+                displayStressResults(data, scenarioKey);
+            } catch (e) { showMessage(e.message); }
+        }
+
+        function displayStressResults(data, scenarioKey) {
+            const impact = data.portfolio_impact;
+            const lossPct = impact.total_loss_pct;
+            const lossClass = lossPct >= 0 ? 'positive' : 'negative';
+            const lossSign = lossPct > 0 ? 'gain' : 'loss';
+
+            let assetRows = '';
+            data.asset_impacts.forEach(a => {
+                const shock = a.estimated_shock_pct;
+                const shockClass = shock >= 0 ? 'positive' : 'negative';
+                assetRows += `<tr><td>${a.ticker}</td><td>${a.beta}</td><td class="${shockClass}">${shock > 0 ? '+' : ''}${shock}%</td><td class="${shockClass}">₹${a.dollar_impact.toFixed(2)}</td></tr>`;
+            });
+
+            const meta = SCENARIO_META[scenarioKey] || { name: scenarioKey, description: '' };
+
+            document.getElementById('stressResults').innerHTML = `
+            <div class="glass" style="padding:1.5rem;">
+                <h3>${data.scenario.name}</h3>
+                <p class="scenario-desc">${data.scenario.description} | market ${data.scenario.market_drop_pct}%</p>
+                <div class="metrics-grid">
+                    <div class="metric-item">original: ₹${impact.original_value}</div>
+                    <div class="metric-item">stressed: ₹${impact.stressed_value}</div>
+                    <div class="metric-item ${lossClass}">${lossSign}: ₹${impact.total_loss_dollar} (${impact.total_loss_pct}%)</div>
+                </div>
+                <h4 style="margin-top:20px;">per‑asset impact</h4>
+                <table>
+                    <tr><th>Ticker</th><th>Beta</th><th>Shock %</th><th>Dollar impact</th></tr>
+                    ${assetRows}
+                </table>
+                <p style="margin-top:15px; color:#9f7afe;">${meta.description}</p>
+            </div>
+        `;
+        }
+
+        // Tab switching
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
+            document.getElementById(tabId).style.display = 'block';
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelector(`.tab[data-tab="${tabId}"]`).classList.add('active');
+
+            // Load data when switching to certain tabs
+            if (tabId === 'scenario') {
+                renderShockInputs();
+            }
+            if (tabId === 'correlation' && holdings.length) {
+                callApi('/api/risk/correlation', { holdings }).then(renderCorrelation).catch(showMessage);
+            }
+        }
+
+        // Expose functions to global
+        window.addTickerRow = addTickerRow;
+        window.removeRow = removeRow;
+        window.validateTickers = validateTickers;
+        window.loadFullAnalysis = loadFullAnalysis;
+        window.switchTab = switchTab;
+        window.runMonteCarlo = runMonteCarlo;
+        window.runShockAnalysis = runShockAnalysis;
+        window.runStressTest = runStressTest;
+    </script>
+</body>
+
+</html>
