@@ -1,44 +1,177 @@
-# Stock-Portfolio-Risk-Analyzer
-**PortfolioRisk Lens**: A web-based platform that empowers retail investors to understand and quantify portfolio risk through professional-grade analytics and interactive simulations.
+🧩 Problem Statement
+What is the Problem?
+Most everyday people (like students, young professionals, or first-time investors) invest in stocks without really understanding how risky their portfolio is. They see their money go up and down but don't know why or what to do about it.
+Why Does This Problem Exist?
 
-# 1. Problem Statement
-# Problem Title
-The Retail Investor’s Risk Blind Spot
+📉 Too complex — Risk analysis tools like Bloomberg Terminal cost thousands of dollars per year
+🧮 Hard math — Metrics like Sharpe Ratio, Beta, and VaR sound scary and confusing
+🔒 No access — Most powerful tools are only available to banks and big investment firms
+📊 No visuals — Raw stock data is just numbers — hard to understand without charts
 
-# Problem Description
-Retail investors increasingly manage diversified stock portfolios, yet they lack access to tools that translate raw portfolio data into meaningful risk insights. Most rely on basic metrics like daily gains and losses, which fail to reveal true exposure. Without understanding concepts like Value at Risk (VaR), Sharpe Ratio, beta, and correlation, investors:
+Real-World Impact
+Impact AreaDescription💸 Financial LossRetail investors lose money because they don't know their portfolio is too risky😰 Emotional StressMarket crashes cause panic because investors don't understand their exposure📚 Knowledge GapFirst-time investors have no tool to learn about risk while investing🏦 Business GapNo free, beginner-friendly risk analyzer exists in the market
 
-Underestimate potential losses during market downturns.
+Bottom line: Everyday investors need a simple, free, and visual tool to understand and manage portfolio risk — and that's exactly what we built.
 
-Miss hidden concentration risks and diversification weaknesses.
 
-Make decisions based on intuition rather than quantitative evidence.
+👤 User Persona
+Who Are We Building For?
 
-Remain vulnerable to financial shocks due to unstructured analysis.
+👨‍🎓 Persona 1 — Rohan, 20-year-old B.Tech Student
 
-Professional risk analytics exist (Bloomberg Terminal, FactSet) but are prohibitively expensive and complex for individual investors. Spreadsheets offer flexibility but require deep financial modeling skills and manual effort, making them impractical for routine use.
+Background: Started investing ₹5,000 in stocks using Zerodha. Knows basic HTML/CSS but no finance.
+Goal: Grow his savings without losing everything
+Pain Points:
 
-# Target Users
-Retail Investors – Individuals actively managing their own portfolios (typically 5–20+ stocks) who want to move beyond superficial performance tracking.
+Doesn't understand what "portfolio risk" means
+Gets confused by financial jargon
+No tool explains risk in simple terms
 
-Finance Students – Learners seeking hands-on experience with portfolio risk metrics (VaR, Sharpe, Monte Carlo) without needing to code or access expensive platforms.
 
-# Existing Gaps 
-No integrated web tool that automatically calculates core risk metrics (VaR, beta, Sharpe, correlation) from a simple portfolio input.
 
-Lack of interactive scenario analysis – retail investors cannot easily answer “what if” questions (e.g., “What if a key stock drops 20%?”) or run Monte Carlo simulations to see potential future outcomes.
 
-Visualization deficit – risk data is often presented as raw numbers; there is no intuitive dashboard that shows risk decomposition, correlation heatmaps, or simulation paths.
+👩‍💼 Persona 2 — Priya, 28-year-old Working Professional
 
-Accessibility vs. complexity gap – existing solutions are either too basic (portfolio trackers showing only returns) or too advanced (professional terminals, complex Excel models), leaving retail investors without a middle-ground option.
+Background: Has ₹50,000 invested in 6 different stocks. Works full-time, no time to research.
+Goal: Make sure her portfolio is balanced and not too risky
+Pain Points:
 
-# solution 
-Feature 1: Data Processing. The user inputs their stock tickers (e.g., 'AAPL, TSLA, KO'). The tool automatically pulls historical data. This solves the challenge of manual data entry.
+No single dashboard shows all her stocks + risk in one place
+Doesn't know if she's over-invested in one sector
 
-Feature 2: Risk Calculation. It runs complex math in the background—matrix operations for correlations, statistical models for VaR. This solves the challenge of 'I don't know how to calculate this.'
 
-Feature 3: Scenario Simulation. Here is the 'wow' factor. A user can type, 'What if Tesla drops 20%?' and the dashboard instantly updates to show the new total portfolio value. This solves the challenge of 'I don't know how vulnerable I am.'
 
-Feature 4: Visualization. We don't just spit out numbers like 'Beta: 1.2'. We show a heatmap of correlations and a graph of the Monte Carlo simulation. This solves the challenge of 'I don't know what this number means.'
 
-Technical Approach: We will handle the computational stability by using established financial libraries (like Pandas for data and NumPy for math) to ensure our Monte Carlo simulations are accurate and fast."
+👨‍💻 Persona 3 — Arjun, Finance Student
+
+Background: Learning about financial markets, wants to apply classroom theory to real data
+Goal: See real Sharpe Ratio, Beta, and VaR values for actual stocks
+Pain Points:
+
+Paid tools are too expensive for students
+Existing tools are too complex for learning
+
+
+
+
+💡 Proposed Solution
+What Did We Build?
+Stock Portfolio Risk Analyzer is a full-stack web application where users can:
+
+Add their stocks and quantities
+Get real-time prices automatically
+See their total portfolio value
+Understand their risk level through simple visualizations
+
+How Does It Solve the Problem?
+Instead of showing scary numbers, our app:
+
+✅ Translates complex metrics into simple language ("Your portfolio is Medium Risk")
+✅ Shows color-coded charts (Green = Safe, Red = Risky)
+✅ Gives actionable alerts ("You have 70% in Tech stocks — consider diversifying!")
+✅ Is completely free to use
+
+✨ Key Features
+
+📡 Real-Time Stock Data — Fetches live prices using Alpha Vantage / Yahoo Finance API
+📊 Risk Metrics Dashboard — Shows Volatility, Beta, Sharpe Ratio, and Value at Risk (VaR)
+🥧 Diversification Analysis — Pie charts showing sector-wise portfolio split
+🎨 Visual Risk Dashboard — Beautiful charts built with Recharts / Chart.js
+🚨 Risk Alerts — Warns users when a single stock or sector is too dominant
+🔐 Secure Login — JWT-based authentication to save your portfolio
+📱 Responsive Design — Works on mobile and desktop
+
+
+🛠️ Tech Stack
+LayerTechnologyWhy We Used It🎨 FrontendReact.js + TailwindCSSFast, component-based UI with clean styling📊 ChartsRecharts / Chart.jsBeautiful, responsive financial charts⚙️ BackendNode.js + ExpressLightweight REST API server🗄️ DatabasePostgreSQLStores user accounts and portfolio data📈 Stock APIsAlpha Vantage / Yahoo Finance / FinnhubReal-time stock price data🔐 AuthJWT (JSON Web Tokens)Secure user login and session management🚀 Frontend DeployVercelFree, fast deployment for React apps🖥️ Backend DeployRender / RailwayFree Node.js backend hosting
+
+🏗️ System Architecture
+┌─────────────────────────────────────────────────────────────────┐
+│                        USER (Browser)                           │
+│                 Opens the React.js Web App                      │
+└───────────────────────────┬─────────────────────────────────────┘
+                            │ HTTP Request
+                            ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                   FRONTEND (React.js)                           │
+│         TailwindCSS UI + Recharts Visualizations                │
+│  - Login / Register Page                                        │
+│  - Portfolio Input Form                                         │
+│  - Risk Dashboard with Charts                                   │
+└───────────────────────────┬─────────────────────────────────────┘
+                            │ REST API Call (fetch/axios)
+                            ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                  BACKEND (Node.js + Express)                    │
+│                     REST API Server                             │
+│  ┌─────────────────┐  ┌──────────────────┐  ┌───────────────┐  │
+│  │   Auth Routes   │  │  Portfolio Routes │  │  Risk Engine  │  │
+│  │  /login/signup  │  │  /add /delete     │  │  Calculates   │  │
+│  │   JWT tokens    │  │  /getPortfolio    │  │  VaR, Beta,   │  │
+│  └─────────────────┘  └──────────────────┘  │  Sharpe Ratio │  │
+│                                              └───────────────┘  │
+└──────────┬────────────────────────┬────────────────────────────-┘
+           │                        │
+           ▼                        ▼
+┌──────────────────┐    ┌───────────────────────────────┐
+│   PostgreSQL DB  │    │     External Stock APIs        │
+│                  │    │                               │
+│  - Users Table   │    │  Alpha Vantage / Finnhub      │
+│  - Portfolio     │    │  Yahoo Finance API            │
+│  - Stock Cache   │    │  (Real-time price data)       │
+└──────────────────┘    └───────────────────────────────┘
+Component Roles
+ComponentRoleReact FrontendShows the UI, sends requests to backend, displays chartsExpress BackendHandles all business logic, routes, and API callsRisk Calculation EnginePure JavaScript functions that compute risk metricsPostgreSQL DatabaseStores user accounts and their saved portfoliosExternal Stock APIsProvides real-time and historical stock price data
+
+🔄 Data Flow
+Here's how data moves through the system step by step:
+Step 1: USER INPUT
+        User enters stock symbols (e.g., AAPL, TSLA) and quantities
+        on the React frontend form
+              ↓
+
+Step 2: API REQUEST
+        Frontend sends a POST request to our backend:
+        POST /api/portfolio/analyze
+        Body: { stocks: [{ symbol: "AAPL", qty: 10 }, ...] }
+              ↓
+
+Step 3: FETCH REAL-TIME DATA
+        Backend calls Alpha Vantage / Yahoo Finance API
+        to get current prices and historical data for each stock
+              ↓
+
+Step 4: RISK CALCULATION
+        Risk Engine processes the data and calculates:
+        → Volatility (how much the stock price moves)
+        → Beta (how it moves compared to the market)
+        → Sharpe Ratio (return vs risk score)
+        → VaR (maximum expected loss in a day/week)
+              ↓
+
+Step 5: DATABASE SAVE
+        Results and portfolio are saved in PostgreSQL
+        linked to the logged-in user's account
+              ↓
+
+Step 6: RESPONSE TO FRONTEND
+        Backend sends back a clean JSON response with
+        all calculated metrics and chart-ready data
+              ↓
+
+Step 7: VISUALIZATION
+        React renders charts, pie graphs, and risk badges
+        User sees their portfolio risk in a simple dashboard
+
+✨ Key Features
+
+📡 Real-Time Stock Prices — Live data from financial APIs, updated every time you analyze
+📊 Volatility Score — See how "jumpy" your stocks are on a simple scale
+⚖️ Beta Analysis — Understand how your portfolio moves with the overall market
+💹 Sharpe Ratio — Know if you're getting good returns for the risk you're taking
+🎯 Value at Risk (VaR) — See the maximum you could lose on a bad day
+🥧 Diversification Pie Chart — Visual breakdown of your portfolio by sector
+🚨 Smart Risk Alerts — Automatic warnings when your portfolio is too concentrated
+🔐 User Authentication — Secure login with JWT so your data is private
+💾 Save & Track — Save multiple portfolios and track them over time
+📱 Mobile Friendly — Fully responsive design, works on any device
