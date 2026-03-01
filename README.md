@@ -1,28 +1,4 @@
-# 🚀 Quick Deploy to Vercel
 
-**Ready to deploy?** Follow these 3 steps:
-
-1. **Deploy Backend** (30 seconds)
-   - Go to [render.com](https://render.com)
-   - Create new Web Service from your GitHub repo
-   - Set Build Command: `pip install -r requirements.txt`
-   - Set Start Command: `gunicorn app:create_app()`
-   - Copy your backend URL (e.g., `https://api.onrender.com`)
-
-2. **Deploy Frontend** (30 seconds)
-   - Go to [vercel.com](https://vercel.com)
-   - Import your GitHub repo
-   - Add Environment Variable: `VITE_BACKEND_URL` = your backend URL from step 1
-   - Deploy
-
-3. **Verify** (10 seconds)
-   - Open your Vercel URL
-   - Check for ✅ Connected below header
-   - Done! 🎉
-
-📖 [See Full Deployment Guide →](./VERCEL_DEPLOYMENT_FIX.md) | [Quick Start →](./VERCEL_QUICK_START.md) | [Checklist →](./DEPLOYMENT_CHECKLIST.md)
-
----
 
 # 🧩 Problem Statement
 What is the Problem?
