@@ -23,3 +23,17 @@ def validate():
 
     result = validate_tickers(tickers)
     return jsonify(result)
+
+
+@portfolio_bp.route("/live-prices", methods=["GET"])
+def live_prices():
+    """
+    GET /api/portfolio/live-prices?tickers=AAPL,MSFT,GOOGL
+    Returns live prices and daily changes for the marquee.
+    """
+    tickers_param = request.args.get("tickers", "AAPL,MSFT,GOOGL,NVDA,TSLA,AMZN")
+    tickers = [t.strip().upper() for t in tickers_param.split(",") if t.strip()]
+    
+    from services.data_service import fetch_live_prices
+    data = fetch_live_prices(tickers)
+    return jsonify({"prices": data})

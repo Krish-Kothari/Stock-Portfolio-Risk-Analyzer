@@ -141,3 +141,29 @@ def get_portfolio_returns(
     returns = returns[tickers]
     portfolio_returns = returns.dot(weights)
     return portfolio_returns, returns
+
+
+def fetch_live_prices(tickers: list[str]) -> list[dict]:
+    """
+    Fetch current live price and daily change for a list of tickers.
+    Returns a list of dicts: {"ticker": str, "price": float, "change": float, "change_pct": float}
+    """
+    results = []
+    for ticker in tickers:
+        try:
+            t = yf.Ticker(ticker)
+            hist = t.history(period="5d")
+            if len(hist) >= 2:
+                current_price = float(hist["Close"].iloc[-1])
+                prev_close = float(hist["Close"].iloc[-2])
+                change = current_price - prev_close
+                change_pct = (change / prev_close) * 100
+                results.append({
+                    "ticker": ticker,
+                    "price": round(current_price, 2),
+                    "change": round(change, 2),
+                    "change_pct": round(change_pct, 2)
+                })
+        except Exception:
+            pass
+    return results

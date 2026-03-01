@@ -20,7 +20,7 @@
             background-color: #0c0f15;
             color: #eaeef2;
             line-height: 1.5;
-            padding: 2rem;
+            padding: 4.5rem 2rem 2rem 2rem;
         }
 
         .glass {
@@ -334,10 +334,80 @@
             font-size: 0.9rem;
             margin: 5px 0 15px;
         }
+
+        /* Marquee styles */
+        .marquee-container {
+            width: 100%;
+            overflow: hidden;
+            background: rgba(10, 13, 18, 0.9);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(0, 255, 200, 0.1);
+            padding: 10px 0;
+            white-space: nowrap;
+            position: fixed;
+            top: 0;
+            left: 0;
+            z-index: 1000;
+        }
+
+        .marquee-content {
+            display: inline-flex;
+            animation: marquee 30s linear infinite;
+        }
+
+        .marquee-content:hover {
+            animation-play-state: paused;
+        }
+
+        .stock-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-right: 50px;
+            font-size: 0.95rem;
+        }
+
+        .stock-ticker {
+            font-weight: 700;
+            color: #b0c4d9;
+        }
+
+        .stock-price {
+            font-weight: 500;
+            color: #fff;
+        }
+
+        .stock-change {
+            font-weight: 600;
+            font-size: 0.85rem;
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+
+        .stock-change.positive {
+            color: #141c24;
+            background-color: #00ffc6;
+        }
+
+        .stock-change.negative {
+            color: #141c24;
+            background-color: #ff4d6d;
+        }
+
+        @keyframes marquee {
+            0% { transform: translateX(100vw); }
+            100% { transform: translateX(-100%); }
+        }
     </style>
 </head>
 
 <body>
+    <div class="marquee-container" id="stockMarqueeContainer">
+        <div class="marquee-content" id="stockMarquee">
+            <span style="color: #90a4b9; font-size: 0.9rem; padding-left: 2rem;">loading live markets...</span>
+        </div>
+    </div>
     <div class="app">
         <div class="logo">
             <div class="logo-icon">📈</div>
@@ -487,7 +557,39 @@
             renderTickerRows();
             populateScenarioDropdown();
             switchTab('overview');
+            initMarquee();
         };
+
+        async function initMarquee() {
+            try {
+                const data = await fetchGet('/api/portfolio/live-prices?tickers=AAPL,MSFT,GOOGL,NVDA,TSLA,AMZN,META,AMD,INTC');
+                const marquee = document.getElementById('stockMarquee');
+                const items = data.prices;
+                
+                const buildItems = () => {
+                    let s = '';
+                    items.forEach(item => {
+                        const changeClass = item.change >= 0 ? 'positive' : 'negative';
+                        const sign = item.change >= 0 ? '+' : '';
+                        s += `<div class="stock-item">
+                            <span class="stock-ticker">${item.ticker}</span>
+                            <span class="stock-price">$${item.price.toFixed(2)}</span>
+                            <span class="stock-change ${changeClass}">${sign}${item.change.toFixed(2)} (${sign}${item.change_pct.toFixed(2)}%)</span>
+                        </div>`;
+                    });
+                    return s;
+                };
+                
+                // Duplicate items to ensure smooth continuous marquee flow when transitioning
+                marquee.innerHTML = buildItems() + buildItems();
+                
+                // Adjust animation duration depending on number of items for consistent speed
+                marquee.style.animationDuration = `${Math.max(30, items.length * 5)}s`;
+            } catch (e) {
+                console.error("Marquee load failed:", e);
+                document.getElementById('stockMarqueeContainer').style.display = 'none';
+            }
+        }
 
         function populateScenarioDropdown() {
             const select = document.getElementById("scenarioSelect");
@@ -564,6 +666,14 @@
         }
 
         // ---------- API CALLS ----------
+        async function fetchGet(endpoint) {
+            const url = `${BACKEND_URL}${endpoint}`;
+            const res = await fetch(url);
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'API error');
+            return data;
+        }
+
         async function callApi(endpoint, body) {
             const url = `${BACKEND_URL}${endpoint}`;
             const res = await fetch(url, {
@@ -723,24 +833,63 @@
         function renderMonteCarlo(data) {
             const percentiles = data.percentile_paths;
             const days = data.days;
+            const sampled = data.sampled_paths || [];
+
             if (mcChartInstance) mcChartInstance.destroy();
             const ctx = document.getElementById('mcChart').getContext('2d');
+            
+            const datasets = [];
+            
+            // 1) Add individual simulated paths as thin, multi-colored lines
+            sampled.forEach((path, i) => {
+                const hue = Math.floor(Math.random() * 360);
+                datasets.push({
+                    label: `Path ${i+1}`,
+                    data: path,
+                    borderColor: `hsla(${hue}, 80%, 65%, 0.6)`,
+                    borderWidth: 1,
+                    pointRadius: 0,
+                    tension: 0.1,
+                    fill: false
+                });
+            });
+            
+            // 2) Add benchmark/percentile lines thicker and on top
+            datasets.push(
+                { label: '50% (Median)', data: percentiles.p50, borderColor: '#fff', borderWidth: 3.5, pointRadius: 0, tension: 0.1 },
+                { label: '5% (Worst)', data: percentiles.p5, borderColor: '#ff4d6d', borderWidth: 3, pointRadius: 0, tension: 0.1, borderDash: [5, 5] },
+                { label: '95% (Best)', data: percentiles.p95, borderColor: '#00ffc6', borderWidth: 3, pointRadius: 0, tension: 0.1, borderDash: [5, 5] }
+            );
+
             mcChartInstance = new Chart(ctx, {
                 type: 'line',
                 data: {
                     labels: days,
-                    datasets: [
-                        { label: '5%', data: percentiles.p5, borderColor: '#ff4d6d', borderWidth: 2, pointRadius: 0, tension: 0.1 },
-                        { label: '25%', data: percentiles.p25, borderColor: '#ffb86b', borderWidth: 2, pointRadius: 0, tension: 0.1 },
-                        { label: '50%', data: percentiles.p50, borderColor: '#f1fa8c', borderWidth: 3, pointRadius: 0, tension: 0.1 },
-                        { label: '75%', data: percentiles.p75, borderColor: '#9f7afe', borderWidth: 2, pointRadius: 0, tension: 0.1 },
-                        { label: '95%', data: percentiles.p95, borderColor: '#00ffc6', borderWidth: 2, pointRadius: 0, tension: 0.1 }
-                    ]
+                    datasets: datasets
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    backgroundColor: '#0c0f15'
+                    backgroundColor: '#0c0f15',
+                    plugins: {
+                        legend: {
+                            labels: {
+                                filter: function(item, chart) {
+                                    // Hide the noisy "Path X" from the top legend, keep only percentiles
+                                    return item.text.includes('%');
+                                }
+                            }
+                        },
+                        tooltip: {
+                            filter: function(tooltipItem) {
+                                // Only show tooltips for the thick percentile lines to prevent clutter
+                                return tooltipItem.dataset.label.includes('%');
+                            }
+                        }
+                    },
+                    animation: {
+                        duration: 800
+                    }
                 }
             });
 
