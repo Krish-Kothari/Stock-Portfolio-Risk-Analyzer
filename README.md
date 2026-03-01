@@ -139,4 +139,4 @@ Here's how data moves through the system step by step:
 
 
 **vercel link:** https://portfolio-risk-intelligence.vercel.app/
-**video link:** https://drive.google.com/file/d/1xE9wsmAvVGYzck3Zn5XEu54dYE2ZEwVq/view?usp=sharing
+**video link:**  https://drive.google.com/drive/folders/1RvMQQLDL0uEUJ7Z4Q50GFqgqwr0O8Jt0?usp=sharing
