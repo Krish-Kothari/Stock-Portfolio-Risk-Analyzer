@@ -1,5 +1,4 @@
 
-
 # 🧩 Problem Statement
 What is the Problem?
 Most everyday people (like students, young professionals, or first-time investors) invest in stocks without really understanding how risky their portfolio is. They see their money go up and down but don't know why or what to do about it.
@@ -136,3 +135,8 @@ Here's how data moves through the system step by step:
 🔐 User Authentication — Secure login with JWT so your data is private
 💾 Save & Track — Save multiple portfolios and track them over time
 📱 Mobile Friendly — Fully responsive design, works on any device
+
+
+
+**vercel link:** https://portfolio-risk-intelligence.vercel.app/
+**video link:** https://drive.google.com/file/d/1xE9wsmAvVGYzck3Zn5XEu54dYE2ZEwVq/view?usp=sharing
