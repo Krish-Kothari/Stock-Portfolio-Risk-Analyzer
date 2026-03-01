@@ -8,6 +8,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap"
         rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="./config.js"></script>
     <style>
         * {
             margin: 0;
@@ -63,6 +64,7 @@
             font-size: 2rem;
             letter-spacing: -0.02em;
             background: linear-gradient(120deg, #ffffff, #b0f0ff);
+            background-clip: text;
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
@@ -414,6 +416,13 @@
             <h1>volt. <span>risk analyzer</span></h1>
         </div>
 
+        <!-- API Configuration Debug (hidden on production) -->
+        <div id="debugInfo" style="display: none; background: #1f2e3a; padding: 12px 20px; border-radius: 12px; margin-bottom: 1.5rem; font-size: 0.85rem; border: 1px solid #00ffc6;">
+            <div style="color: #00ffc6; font-weight: 600;">🔧 API Configuration</div>
+            <div style="color: #90a4b9; margin-top: 8px;">Backend URL: <span id="debugBackendUrl">Loading...</span></div>
+            <div style="color: #90a4b9;">Status: <span id="debugStatus" style="color: #ff4d6d;">Checking...</span></div>
+        </div>
+
         <!-- portfolio input panel -->
         <div class="glass input-panel">
             <div class="ticker-list" id="tickerList">
@@ -525,501 +534,552 @@
             </div>
         </div>
     </div>
-
     <script>
-        // ---------- CONFIG ----------
-        const BACKEND_URL = window.location.protocol === 'file:' ? "http://127.0.0.1:5000" : "";
+    /* ================= CONFIG ================= */
+    // Backend URL is loaded from config.js
+    const BACKEND_URL = window.API_CONFIG?.BACKEND_URL || window.location.origin;
+    
+    if (!BACKEND_URL) {
+        console.error('ERROR: Backend URL is not configured. Please set VITE_BACKEND_URL environment variable.');
+    }
 
-        // ---------- GLOBAL STATE ----------
-        let holdings = [
-            { ticker: "AAPL", weight: 0.4 },
-            { ticker: "MSFT", weight: 0.3 },
-            { ticker: "GOOGL", weight: 0.3 }
+    /* ================= GLOBAL STATE ================= */
+    let holdings = [
+    { ticker: "AAPL", weight: 0.4 },
+    { ticker: "MSFT", weight: 0.3 },
+    { ticker: "GOOGL", weight: 0.3 }
+    ];
+
+    let historyChartInstance = null;
+    let mcChartInstance = null;
+
+    /* ================= INIT ================= */
+    window.onload = function () {
+        renderTickerRows();
+        initShockInputs();
+        initScenariosDropdown();
+        updateLiveMarquee();
+        checkApiConnection();
+        setInterval(updateLiveMarquee, 30000);  // Update every 30 seconds
+        switchTab('overview');
+    };
+
+    function checkApiConnection() {
+        const debugUrl = document.getElementById('debugBackendUrl');
+        const debugStatus = document.getElementById('debugStatus');
+        const debugInfo = document.getElementById('debugInfo');
+        
+        // Show debug info in development
+        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+            debugInfo.style.display = 'block';
+        }
+        
+        debugUrl.textContent = BACKEND_URL || 'Not configured';
+        
+        if (!BACKEND_URL) {
+            debugStatus.textContent = '❌ No backend URL configured';
+            debugStatus.style.color = '#ff4d6d';
+            showMessage('ERROR: Backend API URL not configured. Please set VITE_BACKEND_URL environment variable.');
+            return;
+        }
+        
+        // Test health check
+        fetchGet('/api/health')
+            .then(data => {
+                debugStatus.textContent = '✅ Connected';
+                debugStatus.style.color = '#00ffc6';
+                console.log('✓ Backend connection successful!', data);
+            })
+            .catch(err => {
+                debugStatus.innerHTML = `❌ Failed: ${err.message.substring(0, 50)}...`;
+                debugStatus.style.color = '#ff4d6d';
+                console.error('✗ Backend connection failed:', err);
+            });
+    }
+
+    function initShockInputs() {
+        const h = getHoldingsFromUI();
+        let html = '';
+        h.forEach(holding => {
+            html += `
+                <div class="shock-row">
+                    <span style="min-width:80px; font-weight:600;">${holding.ticker}</span>
+                    <input type="hidden" class="shock-ticker" value="${holding.ticker}">
+                    <label>shock %: <input type="number" class="shock-pct" value="-10" min="-100" max="100" style="background:#1f2e3a; border:none; color:white; padding:8px; border-radius:20px; width:100px;"></label>
+                </div>
+            `;
+        });
+        document.getElementById("shockInputs").innerHTML = html;
+    }
+
+    function initScenariosDropdown() {
+        const scenarios = [
+            { key: "2008_crisis", name: "2008 Financial Crisis" },
+            { key: "1987_crash", name: "1987 Black Monday" },
+            { key: "covid_2020", name: "COVID-19 (2020)" },
+            { key: "tech_correction", name: "Tech Correction" }
         ];
 
-        // Scenario metadata (for display only - actual data comes from backend)
-        const SCENARIO_META = {
-            "2008_crisis": { name: "2008 Financial Crisis", description: "Global financial meltdown triggered by subprime mortgage collapse", group: "historical" },
-            "covid_crash": { name: "COVID-19 Crash (2020)", description: "Rapid market sell-off due to global pandemic", group: "historical" },
-            "dot_com_bust": { name: "Dot-Com Bust (2000-2002)", description: "Technology bubble collapse", group: "historical" },
-            "2022_bear": { name: "2022 Bear Market", description: "Interest rate hikes and inflation-driven sell-off", group: "historical" },
-            "future_pandemic": { name: "Future Pandemic", description: "Travel & energy drop, healthcare & tech resilient", group: "future" },
-            "ai_boom": { name: "AI Revolution", description: "Tech surges, energy lags, automation boom", group: "future" },
-            "rate_cut_rally": { name: "Rate Cut Rally", description: "Growth stocks rally, utilities flat", group: "future" }
-        };
+        let html = `<option value="">-- Select Scenario --</option>`;
+        scenarios.forEach(s => {
+            html += `<option value="${s.key}">${s.name}</option>`;
+        });
+        document.getElementById("scenarioSelect").innerHTML = html;
+    }
 
-        // Chart instances to avoid duplicates
-        let historyChartInstance = null;
-        let mcChartInstance = null;
+    async function updateLiveMarquee() {
+        try {
+            const tickers = holdings.map(h => h.ticker).join(",") || "AAPL,MSFT,GOOGL,NVDA,TSLA";
+            const data = await fetchGet(`/api/portfolio/live-prices?tickers=${tickers}`);
+            const prices = data.prices || [];
 
-        // ---------- INIT ----------
-        window.onload = function () {
-            renderTickerRows();
-            populateScenarioDropdown();
-            switchTab('overview');
-            initMarquee();
-        };
+            let marqueeHtml = '';
+            prices.forEach(p => {
+                const changeClass = p.change_pct >= 0 ? 'positive' : 'negative';
+                const changeSymbol = p.change_pct >= 0 ? '+' : '';
+                marqueeHtml += `
+                    <div class="stock-item">
+                        <span class="stock-ticker">${p.ticker}</span>
+                        <span class="stock-price">₹${p.price}</span>
+                        <span class="stock-change ${changeClass}">${changeSymbol}${p.change_pct}%</span>
+                    </div>
+                `;
+            });
 
-        async function initMarquee() {
+            // Double it for seamless loop
+            marqueeHtml += marqueeHtml;
+            document.getElementById("stockMarquee").innerHTML = marqueeHtml;
+        } catch (e) {
+            console.error("Marquee update failed:", e);
+        }
+    }
+
+    /* ================= API HELPERS ================= */
+    async function fetchGet(endpoint) {
+        if (!BACKEND_URL) {
+            throw new Error('Backend API URL not configured. Check your environment variables.');
+        }
+        
+        const url = `${BACKEND_URL}${endpoint}`;
+        console.log('GET:', url);
+        
+        try {
+            const res = await fetch(url, {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include'  // For CORS with credentials
+            });
+            
+            const text = await res.text();
+            let data;
+            
             try {
-                const data = await fetchGet('/api/portfolio/live-prices?tickers=AAPL,MSFT,GOOGL,NVDA,TSLA,AMZN,META,AMD,INTC');
-                const marquee = document.getElementById('stockMarquee');
-                const items = data.prices;
-                
-                const buildItems = () => {
-                    let s = '';
-                    items.forEach(item => {
-                        const changeClass = item.change >= 0 ? 'positive' : 'negative';
-                        const sign = item.change >= 0 ? '+' : '';
-                        s += `<div class="stock-item">
-                            <span class="stock-ticker">${item.ticker}</span>
-                            <span class="stock-price">$${item.price.toFixed(2)}</span>
-                            <span class="stock-change ${changeClass}">${sign}${item.change.toFixed(2)} (${sign}${item.change_pct.toFixed(2)}%)</span>
-                        </div>`;
-                    });
-                    return s;
-                };
-                
-                // Duplicate items to ensure smooth continuous marquee flow when transitioning
-                marquee.innerHTML = buildItems() + buildItems();
-                
-                // Adjust animation duration depending on number of items for consistent speed
-                marquee.style.animationDuration = `${Math.max(30, items.length * 5)}s`;
-            } catch (e) {
-                console.error("Marquee load failed:", e);
-                document.getElementById('stockMarqueeContainer').style.display = 'none';
+                data = JSON.parse(text);
+            } catch (err) {
+                console.error("Response was not JSON:", text, "Status:", res.status);
+                throw new Error(`Server error (${res.status}): ${text.substring(0, 200)}`);
             }
-        }
-
-        function populateScenarioDropdown() {
-            const select = document.getElementById("scenarioSelect");
-            select.innerHTML = "";
-
-            const historicalGroup = document.createElement("optgroup");
-            historicalGroup.label = "📜 Historical Scenarios";
-            const futureGroup = document.createElement("optgroup");
-            futureGroup.label = "🔮 Future Predictions";
-
-            Object.entries(SCENARIO_META).forEach(([key, meta]) => {
-                const option = document.createElement("option");
-                option.value = key;
-                option.textContent = meta.name;
-                if (meta.group === "historical") historicalGroup.appendChild(option);
-                else futureGroup.appendChild(option);
-            });
-
-            select.appendChild(historicalGroup);
-            select.appendChild(futureGroup);
-        }
-
-        // ---------- TICKER ROWS ----------
-        function renderTickerRows() {
-            const container = document.getElementById("tickerList");
-            // remove existing rows except template
-            container.querySelectorAll('.ticker-row:not([id="rowTemplate"])').forEach(el => el.remove());
-            holdings.forEach((h) => {
-                const row = createRowFromTemplate(h.ticker, h.weight);
-                container.appendChild(row);
-            });
-        }
-
-        function createRowFromTemplate(ticker, weight) {
-            const template = document.getElementById("rowTemplate");
-            const newRow = template.cloneNode(true);
-            newRow.style.display = "flex";
-            newRow.removeAttribute("id");
-            const inputs = newRow.querySelectorAll('input');
-            inputs[0].value = ticker;
-            inputs[1].value = weight;
-            return newRow;
-        }
-
-        function addTickerRow() {
-            const container = document.getElementById("tickerList");
-            const row = createRowFromTemplate("", "");
-            container.appendChild(row);
-        }
-
-        function removeRow(btn) {
-            const row = btn.closest('.ticker-row');
-            if (document.querySelectorAll('.ticker-row:not([id="rowTemplate"])').length > 1) {
-                row.remove();
-            } else {
-                alert("keep at least one asset");
+            
+            if (!res.ok) {
+                throw new Error(data.error || `API error: ${res.status}`);
             }
-        }
-
-        function getHoldingsFromUI() {
-            const rows = document.querySelectorAll('.ticker-row:not([id="rowTemplate"])');
-            const holdings = [];
-            rows.forEach(row => {
-                const ticker = row.querySelector('.ticker-symbol')?.value.trim().toUpperCase();
-                const weight = parseFloat(row.querySelector('.ticker-weight')?.value);
-                if (ticker && !isNaN(weight) && weight > 0) holdings.push({ ticker, weight });
-            });
-            // normalize weights to sum 1
-            const total = holdings.reduce((acc, h) => acc + h.weight, 0);
-            if (total > 0) {
-                holdings.forEach(h => h.weight = h.weight / total);
-            }
-            return holdings;
-        }
-
-        // ---------- API CALLS ----------
-        async function fetchGet(endpoint) {
-            const url = `${BACKEND_URL}${endpoint}`;
-            const res = await fetch(url);
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error || 'API error');
+            
             return data;
+        } catch (error) {
+            console.error('API Error:', error);
+            if (error.message.includes('Failed to fetch')) {
+                throw new Error(`Cannot reach backend API. Make sure:\n1. Backend server is running\n2. Backend URL is correct: ${BACKEND_URL}\n3. CORS is enabled in backend\n\nOriginal: ${error.message}`);
+            }
+            throw error;
         }
+    }
 
-        async function callApi(endpoint, body) {
-            const url = `${BACKEND_URL}${endpoint}`;
+    async function callApi(endpoint, body) {
+        if (!BACKEND_URL) {
+            throw new Error('Backend API URL not configured. Check your environment variables.');
+        }
+        
+        const url = `${BACKEND_URL}${endpoint}`;
+        console.log('POST:', url, 'Body:', body);
+        
+        try {
             const res = await fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(body)
+                body: JSON.stringify(body),
+                credentials: 'include'  // For CORS with credentials
             });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error || 'API error');
+            
+            const text = await res.text();
+            let data;
+            
+            try {
+                data = JSON.parse(text);
+            } catch (err) {
+                console.error("Response was not JSON:", text, "Status:", res.status);
+                throw new Error(`Server error (${res.status}): ${text.substring(0, 200)}`);
+            }
+            
+            if (!res.ok) {
+                throw new Error(data.error || `API error: ${res.status}`);
+            }
+            
             return data;
-        }
-
-        function showMessage(msg, isError = true) {
-            const el = document.getElementById('globalMessage');
-            el.style.display = 'block';
-            el.innerText = msg;
-            if (!isError) el.style.background = '#00ffc620';
-            setTimeout(() => el.style.display = 'none', 4000);
-        }
-
-        // validate tickers
-        async function validateTickers() {
-            const h = getHoldingsFromUI();
-            const tickers = h.map(x => x.ticker);
-            try {
-                const data = await callApi('/api/portfolio/validate', { tickers });
-                const invalid = data.invalid;
-                if (invalid.length === 0) showMessage('✅ all tickers valid', false);
-                else showMessage(`❌ invalid: ${invalid.join(', ')}`);
-            } catch (e) {
-                showMessage(e.message);
+        } catch (error) {
+            console.error('API Error:', error);
+            if (error.message.includes('Failed to fetch')) {
+                throw new Error(`Cannot reach backend API. Make sure:\n1. Backend server is running at: ${BACKEND_URL}\n2. CORS is enabled in backend\n3. Network allows cross-origin requests`);
             }
+            throw error;
         }
+    }
 
-        // main analysis
-        async function loadFullAnalysis() {
-            const h = getHoldingsFromUI();
-            if (h.length === 0) return showMessage('enter at least one holding');
-            holdings = h; // update global
-            try {
-                const metrics = await callApi('/api/risk/metrics', { holdings: h });
-                renderOverview(metrics);
-                // also load correlation and individual for their tabs
-                const corr = await callApi('/api/risk/correlation', { holdings: h });
-                renderCorrelation(corr);
-                const indiv = await callApi('/api/risk/individual', { holdings: h });
-                renderIndividualRisk(indiv.assets);
-                switchTab('overview');
-            } catch (e) {
-                showMessage(e.message);
-            }
+    function showMessage(msg, isError = true) {
+    const el = document.getElementById("globalMessage");
+    el.style.display = "block";
+    el.innerText = msg;
+    el.style.background = isError ? "#ff4d6d20" : "#00ffc620";
+    setTimeout(() => (el.style.display = "none"), 4000);
+    }
+
+    /* ================= TICKER UI ================= */
+    function renderTickerRows() {
+    const container = document.getElementById("tickerList");
+    container.querySelectorAll('.ticker-row:not([id="rowTemplate"])').forEach(el => el.remove());
+
+    holdings.forEach(h => {
+        const row = createRowFromTemplate(h.ticker, h.weight);
+        container.appendChild(row);
+    });
+    }
+
+    function createRowFromTemplate(ticker, weight) {
+    const template = document.getElementById("rowTemplate");
+    const row = template.cloneNode(true);
+    row.style.display = "flex";
+    row.removeAttribute("id");
+    row.querySelector(".ticker-symbol").value = ticker;
+    row.querySelector(".ticker-weight").value = weight;
+    return row;
+    }
+
+    function addTickerRow() {
+    const container = document.getElementById("tickerList");
+    container.appendChild(createRowFromTemplate("", ""));
+    }
+
+    function removeRow(btn) {
+    const rows = document.querySelectorAll('.ticker-row:not([id="rowTemplate"])');
+    if (rows.length > 1) btn.closest(".ticker-row").remove();
+    else alert("Keep at least one asset");
+    }
+
+    function getHoldingsFromUI() {
+    const rows = document.querySelectorAll('.ticker-row:not([id="rowTemplate"])');
+    const h = [];
+    rows.forEach(row => {
+        const ticker = row.querySelector(".ticker-symbol").value.trim().toUpperCase();
+        const weight = parseFloat(row.querySelector(".ticker-weight").value);
+        if (ticker && !isNaN(weight)) h.push({ ticker, weight });
+    });
+
+    const total = h.reduce((a, b) => a + b.weight, 0);
+    if (total > 0) h.forEach(x => x.weight /= total);
+    return h;
+    }
+
+    /* ================= VALIDATE ================= */
+    async function validateTickers() {
+    const h = getHoldingsFromUI();
+    try {
+        const data = await callApi("/api/portfolio/validate", { tickers: h.map(x => x.ticker) });
+        if (data.invalid.length === 0) showMessage("✅ All tickers valid", false);
+        else showMessage("❌ Invalid: " + data.invalid.join(", "));
+    } catch (e) {
+        showMessage(e.message);
+    }
+    }
+
+    /* ================= MAIN ANALYSIS ================= */
+    async function loadFullAnalysis() {
+    const h = getHoldingsFromUI();
+    if (!h.length) return showMessage("Enter at least one asset");
+
+    holdings = h;
+
+    try {
+        const metrics = await callApi("/api/risk/metrics", { holdings: h });
+        renderOverview(metrics);
+
+        const corr = await callApi("/api/risk/correlation", { holdings: h });
+        renderCorrelation(corr);
+
+        const indiv = await callApi("/api/risk/individual", { holdings: h });
+        renderIndividualRisk(indiv.assets);
+
+        // Reinitialize shock and scenario inputs
+        initShockInputs();
+        initScenariosDropdown();
+
+        switchTab("overview");
+    } catch (e) {
+        showMessage(e.message);
+    }
+    }
+
+    /* ================= RENDER FUNCTIONS ================= */
+    function renderOverview(data) {
+    const s = data.portfolio_summary || {};
+    const r = data.return_metrics || {};
+    const risk = data.risk_metrics || {};
+    const varM = data.var_metrics || {};
+    const perf = data.performance_ratios || {};
+    const bench = data.benchmark_metrics || {};
+
+    document.getElementById("summaryMetrics").innerHTML = `
+        <div class="metric-item"><div class="metric-label">Tickers</div><div class="metric-value">${(s.tickers || []).join(", ")}</div></div>
+        <div class="metric-item"><div class="metric-label">Investment</div><div class="metric-value">₹${(s.investment_amount || 0).toLocaleString()}</div></div>
+        <div class="metric-item"><div class="metric-label">Ann. Return</div><div class="metric-value">${r.annualized_return_pct || 0}%</div></div>
+        <div class="metric-item"><div class="metric-label">Ann. Volatility</div><div class="metric-value">${risk.annualized_volatility_pct || 0}%</div></div>
+        <div class="metric-item"><div class="metric-label">Max Drawdown</div><div class="metric-value">${risk.max_drawdown_pct || 0}%</div></div>
+    `;
+
+    document.getElementById("varMetrics").innerHTML = `
+        <div class="metric-item"><div class="metric-label">Historical VaR (95%)</div><div class="metric-value">${varM.historical_var_1d_pct || 0}%</div><div class="metric-unit">₹${varM.historical_var_1d_dollar || 0}</div></div>
+        <div class="metric-item"><div class="metric-label">Parametric VaR</div><div class="metric-value">${varM.parametric_var_1d_pct || 0}%</div></div>
+        <div class="metric-item"><div class="metric-label">Historical CVaR</div><div class="metric-value">${varM.historical_cvar_1d_pct || 0}%</div></div>
+        <div class="metric-item"><div class="metric-label">Parametric CVaR</div><div class="metric-value">${varM.parametric_cvar_1d_pct || 0}%</div></div>
+    `;
+
+    document.getElementById("perfRatios").innerHTML = `
+        <div><span class="badge">Sharpe</span> ${perf.sharpe_ratio || 0}</div>
+        <div><span class="badge">Sortino</span> ${perf.sortino_ratio || 0}</div>
+    `;
+    document.getElementById("benchmarkInfo").innerHTML = `
+        <div><span class="badge">beta</span> ${bench.beta || 0}</div>
+        <div><span class="badge">alpha</span> ${bench.alpha_pct || 0}%</div>
+    `;
+
+    // History chart
+    const hist = data.historical_performance || {};
+    if (historyChartInstance) historyChartInstance.destroy();
+    const ctx = document.getElementById("historyChart").getContext("2d");
+    historyChartInstance = new Chart(ctx, {
+        type: "line",
+        data: {
+            labels: (hist.dates || []).filter((_, i) => i % 20 === 0),
+            datasets: [
+                { label: "portfolio", data: (hist.portfolio || []).filter((_, i) => i % 20 === 0), borderColor: "#00ffc6", tension: 0.1, pointRadius: 0 },
+                { label: "benchmark", data: (hist.benchmark || []).filter((_, i) => i % 20 === 0), borderColor: "#ff4d6d", tension: 0.1, pointRadius: 0 }
+            ]
+        },
+        options: { responsive: true, maintainAspectRatio: false }
+    });
+    }
+
+    function renderCorrelation(data) {
+    const tickers = data.tickers || [];
+    const matrix = data.correlation_matrix || [];
+    
+    let html = `<table><tr><th></th>`;
+    tickers.forEach(t => html += `<th>${t}</th>`);
+    html += `</tr>`;
+    
+    for (let i = 0; i < tickers.length; i++) {
+        html += `<tr><th>${tickers[i]}</th>`;
+        for (let j = 0; j < tickers.length; j++) {
+            const val = matrix[i]?.[j] || 0;
+            const color = val > 0.7 ? "#ff4d6d" : val > 0.3 ? "#ffb347" : "#00ffc6";
+            html += `<td style="background-color: ${color}20;">${val.toFixed(3)}</td>`;
         }
+        html += `</tr>`;
+    }
+    html += `</table>`;
+    document.getElementById("correlationMatrix").innerHTML = html;
 
-        function renderOverview(data) {
-            const s = data.portfolio_summary;
-            const r = data.return_metrics;
-            const risk = data.risk_metrics;
-            const varM = data.var_metrics;
-            const perf = data.performance_ratios;
-            const bench = data.benchmark_metrics;
+    // Covariance matrix
+    const cov = data.covariance_matrix || [];
+    let covHtml = `<table><tr><th></th>`;
+    tickers.forEach(t => covHtml += `<th>${t}</th>`);
+    covHtml += `</tr>`;
+    
+    for (let i = 0; i < tickers.length; i++) {
+        covHtml += `<tr><th>${tickers[i]}</th>`;
+        for (let j = 0; j < tickers.length; j++) {
+            const val = cov[i]?.[j] || 0;
+            covHtml += `<td>${val.toFixed(6)}</td>`;
+        }
+        covHtml += `</tr>`;
+    }
+    covHtml += `</table>`;
+    document.getElementById("covarianceMatrix").innerHTML = covHtml;
+    }
 
-            document.getElementById('summaryMetrics').innerHTML = `
-            <div class="metric-item"><div class="metric-label">tickers</div><div class="metric-value">${s.tickers.join(', ')}</div></div>
-            <div class="metric-item"><div class="metric-label">investment</div><div class="metric-value">₹${s.investment_amount.toLocaleString()}</div></div>
-            <div class="metric-item"><div class="metric-label">ann. return</div><div class="metric-value">${r.annualized_return_pct}%</div></div>
-            <div class="metric-item"><div class="metric-label">ann. volatility</div><div class="metric-value">${risk.annualized_volatility_pct}%</div></div>
-            <div class="metric-item"><div class="metric-label">max drawdown</div><div class="metric-value">${risk.max_drawdown_pct}%</div></div>
+    function renderIndividualRisk(assets) {
+    let html = `<table><tr><th>Ticker</th><th>Weight</th><th>Return %</th><th>Volatility %</th><th>VaR (95%) %</th><th>Sharpe</th></tr>`;
+    
+    (assets || []).forEach(a => {
+        html += `<tr>
+            <td>${a.ticker}</td>
+            <td>${(a.weight * 100).toFixed(1)}%</td>
+            <td>${a.annualized_return_pct || 0}</td>
+            <td>${a.annualized_volatility_pct || 0}</td>
+            <td>${a.historical_var_1d_pct || 0}</td>
+            <td>${a.sharpe_ratio || 0}</td>
+        </tr>`;
+    });
+    html += `</table>`;
+    document.getElementById("individualRiskTable").innerHTML = html;
+    }
+
+    async function runMonteCarlo() {
+    const h = getHoldingsFromUI();
+    if (!h.length) return showMessage("Enter at least one asset");
+
+    const sims = parseInt(document.getElementById("mcSims").value) || 5000;
+    const days = parseInt(document.getElementById("mcDays").value) || 252;
+    const invest = parseFloat(document.getElementById("mcInvest").value) || 100000;
+
+    try {
+        const result = await callApi("/api/simulate/monte-carlo", {
+            holdings: h,
+            num_simulations: sims,
+            num_days: days,
+            investment_amount: invest
+        });
+
+        const stats = result.terminal_value_stats || {};
+        document.getElementById("mcStats").innerHTML = `
+            <div class="metric-item"><div class="metric-label">Expected Value</div><div class="metric-value">₹${stats.mean?.toLocaleString() || 0}</div></div>
+            <div class="metric-item"><div class="metric-label">5th Percentile</div><div class="metric-value">₹${stats.percentile_5?.toLocaleString() || 0}</div></div>
+            <div class="metric-item"><div class="metric-label">95th Percentile</div><div class="metric-value">₹${stats.percentile_95?.toLocaleString() || 0}</div></div>
+            <div class="metric-item"><div class="metric-label">Prob Loss</div><div class="metric-value">${(result.probability_of_loss * 100).toFixed(1)}%</div></div>
         `;
 
-            document.getElementById('varMetrics').innerHTML = `
-            <div class="metric-item"><div class="metric-label">historical VaR (95%)</div><div class="metric-value">${varM.historical_var_1d_pct}%</div><div class="metric-unit">₹${varM.historical_var_1d_dollar}</div></div>
-            <div class="metric-item"><div class="metric-label">parametric VaR</div><div class="metric-value">${varM.parametric_var_1d_pct}%</div></div>
-            <div class="metric-item"><div class="metric-label">historical CVaR</div><div class="metric-value">${varM.historical_cvar_1d_pct}%</div></div>
-            <div class="metric-item"><div class="metric-label">parametric CVaR</div><div class="metric-value">${varM.parametric_cvar_1d_pct}%</div></div>
-        `;
+        // Chart
+        if (mcChartInstance) mcChartInstance.destroy();
+        const paths = result.percentile_paths || {};
+        const ctx = document.getElementById("mcChart").getContext("2d");
+        mcChartInstance = new Chart(ctx, {
+            type: "line",
+            data: {
+                labels: Array.from({length: (paths.p50 || []).length}, (_, i) => i),
+                datasets: [
+                    { label: "p5", data: paths.p5 || [], borderColor: "#ff4d6d", tension: 0, pointRadius: 0 },
+                    { label: "p50", data: paths.p50 || [], borderColor: "#00ffc6", tension: 0, pointRadius: 0, borderWidth: 2 },
+                    { label: "p95", data: paths.p95 || [], borderColor: "#4CAF50", tension: 0, pointRadius: 0 }
+                ]
+            },
+            options: { responsive: true, maintainAspectRatio: false }
+        });
 
-            document.getElementById('perfRatios').innerHTML = `
-            <div><span class="badge">Sharpe</span> ${perf.sharpe_ratio}</div>
-            <div><span class="badge">Sortino</span> ${perf.sortino_ratio}</div>
-        `;
-            document.getElementById('benchmarkInfo').innerHTML = `
-            <div><span class="badge">beta</span> ${bench.beta}</div>
-            <div><span class="badge">alpha</span> ${bench.alpha_pct}%</div>
-        `;
+        showMessage("✅ Simulation complete", false);
+    } catch (e) {
+        showMessage(e.message);
+    }
+    }
 
-            // history chart
-            const hist = data.historical_performance;
-            if (historyChartInstance) historyChartInstance.destroy();
-            const ctx = document.getElementById('historyChart').getContext('2d');
-            historyChartInstance = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: hist.dates.filter((_, i) => i % 20 === 0),
-                    datasets: [
-                        { label: 'portfolio', data: hist.portfolio.filter((_, i) => i % 20 === 0), borderColor: '#00ffc6', tension: 0.1, pointRadius: 0 },
-                        { label: 'benchmark', data: hist.benchmark.filter((_, i) => i % 20 === 0), borderColor: '#ff4d6d', tension: 0.1, pointRadius: 0 }
-                    ]
-                },
-                options: { responsive: true, maintainAspectRatio: false, backgroundColor: '#0c0f15' }
-            });
-        }
+    async function runShockAnalysis() {
+    const h = getHoldingsFromUI();
+    const shocks = {};
+    document.querySelectorAll(".shock-row").forEach(row => {
+        const ticker = row.querySelector("input[type='hidden']").value.toUpperCase();
+        const pct = parseFloat(row.querySelector(".shock-pct").value) / 100;
+        if (ticker && !isNaN(pct)) shocks[ticker] = pct;
+    });
 
-        function renderCorrelation(data) {
-            const tickers = data.tickers;
-            const corr = data.correlation_matrix;
-            const cov = data.covariance_matrix;
+    if (!Object.keys(shocks).length) return showMessage("Enter at least one shock");
 
-            let corrHtml = '<table><tr><th></th>';
-            tickers.forEach(t => corrHtml += `<th>${t}</th>`);
-            corrHtml += '</tr>';
-            corr.forEach((row, i) => {
-                corrHtml += `<tr><td><b>${tickers[i]}</b></td>`;
-                row.forEach(val => corrHtml += `<td>${val.toFixed(4)}</td>`);
-                corrHtml += '</tr>';
-            });
-            corrHtml += '</table>';
-            document.getElementById('correlationMatrix').innerHTML = corrHtml;
+    try {
+        const result = await callApi("/api/scenario/shock", { holdings: h, shocks });
+        
+        let html = `<div style="flex:1;"><h3>Before Shock</h3>`;
+        const before = result.before || {};
+        html += `<div>Return: ${before.annualized_return_pct || 0}%</div>`;
+        html += `<div>Volatility: ${before.annualized_volatility_pct || 0}%</div>`;
+        html += `<div>Value: ₹${before.portfolio_value?.toLocaleString() || 0}</div>`;
+        html += `</div>`;
 
-            let covHtml = '<table><tr><th></th>';
-            tickers.forEach(t => covHtml += `<th>${t}</th>`);
-            covHtml += '</tr>';
-            cov.forEach((row, i) => {
-                covHtml += `<tr><td><b>${tickers[i]}</b></td>`;
-                row.forEach(val => covHtml += `<td>${val.toFixed(6)}</td>`);
-                covHtml += '</tr>';
-            });
-            covHtml += '</table>';
-            document.getElementById('covarianceMatrix').innerHTML = covHtml;
-        }
+        html += `<div style="flex:1;"><h3>After Shock</h3>`;
+        const after = result.after || {};
+        html += `<div>Return: ${after.annualized_return_pct || 0}%</div>`;
+        html += `<div>Volatility: ${after.annualized_volatility_pct || 0}%</div>`;
+        html += `<div class="negative">Loss: ₹${Math.abs(after.portfolio_change_dollar || 0)}  (${after.portfolio_change_pct}%)</div>`;
+        html += `</div>`;
 
-        function renderIndividualRisk(assets) {
-            let html = '<table><tr><th>ticker</th><th>weight</th><th>ann.ret%</th><th>ann.vol%</th><th>VaR%</th><th>Sharpe</th><th>beta</th><th>maxDD%</th></tr>';
-            assets.forEach(a => {
-                html += `<tr><td>${a.ticker}</td><td>${(a.weight * 100).toFixed(1)}%</td><td>${a.annualized_return_pct}</td><td>${a.annualized_volatility_pct}</td><td>${a.historical_var_1d_pct}</td><td>${a.sharpe_ratio}</td><td>${a.beta}</td><td>${a.max_drawdown_pct}</td></tr>`;
-            });
-            html += '</table>';
-            document.getElementById('individualRiskTable').innerHTML = html;
-        }
+        document.getElementById("shockResults").innerHTML = html;
+        showMessage("✅ Shock analysis complete", false);
+    } catch (e) {
+        showMessage(e.message);
+    }
+    }
 
-        // Monte Carlo
-        async function runMonteCarlo() {
-            const h = getHoldingsFromUI();
-            const num_simulations = parseInt(document.getElementById('mcSims').value);
-            const num_days = parseInt(document.getElementById('mcDays').value);
-            const investment_amount = parseFloat(document.getElementById('mcInvest').value);
-            try {
-                const data = await callApi('/api/simulate/monte-carlo', {
-                    holdings: h,
-                    num_simulations,
-                    num_days,
-                    investment_amount
-                });
-                renderMonteCarlo(data);
-            } catch (e) { showMessage(e.message); }
-        }
+    async function runStressTest() {
+    const h = getHoldingsFromUI();
+    const scenario = document.getElementById("scenarioSelect").value;
 
-        function renderMonteCarlo(data) {
-            const percentiles = data.percentile_paths;
-            const days = data.days;
-            const sampled = data.sampled_paths || [];
+    if (!scenario) return showMessage("Select a scenario");
 
-            if (mcChartInstance) mcChartInstance.destroy();
-            const ctx = document.getElementById('mcChart').getContext('2d');
-            
-            const datasets = [];
-            
-            // 1) Add individual simulated paths as thin, multi-colored lines
-            sampled.forEach((path, i) => {
-                const hue = Math.floor(Math.random() * 360);
-                datasets.push({
-                    label: `Path ${i+1}`,
-                    data: path,
-                    borderColor: `hsla(${hue}, 80%, 65%, 0.6)`,
-                    borderWidth: 1,
-                    pointRadius: 0,
-                    tension: 0.1,
-                    fill: false
-                });
-            });
-            
-            // 2) Add benchmark/percentile lines thicker and on top
-            datasets.push(
-                { label: '50% (Median)', data: percentiles.p50, borderColor: '#fff', borderWidth: 3.5, pointRadius: 0, tension: 0.1 },
-                { label: '5% (Worst)', data: percentiles.p5, borderColor: '#ff4d6d', borderWidth: 3, pointRadius: 0, tension: 0.1, borderDash: [5, 5] },
-                { label: '95% (Best)', data: percentiles.p95, borderColor: '#00ffc6', borderWidth: 3, pointRadius: 0, tension: 0.1, borderDash: [5, 5] }
-            );
-
-            mcChartInstance = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: days,
-                    datasets: datasets
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    backgroundColor: '#0c0f15',
-                    plugins: {
-                        legend: {
-                            labels: {
-                                filter: function(item, chart) {
-                                    // Hide the noisy "Path X" from the top legend, keep only percentiles
-                                    return item.text.includes('%');
-                                }
-                            }
-                        },
-                        tooltip: {
-                            filter: function(tooltipItem) {
-                                // Only show tooltips for the thick percentile lines to prevent clutter
-                                return tooltipItem.dataset.label.includes('%');
-                            }
-                        }
-                    },
-                    animation: {
-                        duration: 800
-                    }
-                }
-            });
-
-            const stats = data.terminal_value_stats;
-            document.getElementById('mcStats').innerHTML = `
-            <div class="metric-item"><div class="metric-label">mean terminal</div><div class="metric-value">₹${stats.mean}</div></div>
-            <div class="metric-item"><div class="metric-label">median</div><div class="metric-value">₹${stats.median}</div></div>
-            <div class="metric-item"><div class="metric-label">95% tail</div><div class="metric-value">₹${stats.p5}</div></div>
-            <div class="metric-item"><div class="metric-label">prob loss</div><div class="metric-value">${data.probability_of_loss_pct}%</div></div>
-        `;
-        }
-
-        // Shock analysis
-        function renderShockInputs() {
-            const h = getHoldingsFromUI();
-            let html = '<div class="flex-row" style="gap:10px; flex-wrap:wrap;">';
-            h.forEach(asset => {
-                html += `<div class="shock-row">
-                <b>${asset.ticker}</b> shock %:
-                <input class="shock-input" id="shock_${asset.ticker}" type="number" value="-10" step="1">%
-            </div>`;
-            });
-            html += '</div>';
-            document.getElementById('shockInputs').innerHTML = html;
-        }
-
-        async function runShockAnalysis() {
-            const h = getHoldingsFromUI();
-            const shocks = {};
-            h.forEach(asset => {
-                const val = parseFloat(document.getElementById(`shock_${asset.ticker}`)?.value);
-                if (!isNaN(val)) shocks[asset.ticker] = val / 100;
-            });
-            try {
-                const data = await callApi('/api/scenario/shock', { holdings: h, shocks });
-                displayShockResults(data);
-            } catch (e) { showMessage(e.message); }
-        }
-
-        function displayShockResults(data) {
-            const before = data.before;
-            const after = data.after;
-            document.getElementById('shockResults').innerHTML = `
-            <div class="glass" style="flex:1; padding:1.5rem;">
-                <h3>before shock</h3>
-                <div>value ₹${before.portfolio_value}</div>
-                <div>ann ret ${before.annualized_return_pct}%</div>
-                <div>vol ${before.annualized_volatility_pct}%</div>
-                <div>VaR ${before.historical_var_1d_pct}%</div>
-            </div>
-            <div class="glass" style="flex:1; padding:1.5rem; border-left-color:#ff4d6d;">
-                <h3>after shock</h3>
-                <div>value ₹${after.portfolio_value}</div>
-                <div>change ₹${(after.portfolio_value - before.portfolio_value).toFixed(2)}</div>
-                <div>ann ret ${after.annualized_return_pct}%</div>
-                <div>vol ${after.annualized_volatility_pct}%</div>
-            </div>
-        `;
-        }
-
-        // Stress test
-        async function runStressTest() {
-            const h = getHoldingsFromUI();
-            const scenarioKey = document.getElementById('scenarioSelect').value;
-            try {
-                const data = await callApi('/api/scenario/stress-test', { holdings: h, scenario: scenarioKey });
-                displayStressResults(data, scenarioKey);
-            } catch (e) { showMessage(e.message); }
-        }
-
-        function displayStressResults(data, scenarioKey) {
-            const impact = data.portfolio_impact;
-            const lossPct = impact.total_loss_pct;
-            const lossClass = lossPct >= 0 ? 'positive' : 'negative';
-            const lossSign = lossPct > 0 ? 'gain' : 'loss';
-
-            let assetRows = '';
-            data.asset_impacts.forEach(a => {
-                const shock = a.estimated_shock_pct;
-                const shockClass = shock >= 0 ? 'positive' : 'negative';
-                assetRows += `<tr><td>${a.ticker}</td><td>${a.beta}</td><td class="${shockClass}">${shock > 0 ? '+' : ''}${shock}%</td><td class="${shockClass}">₹${a.dollar_impact.toFixed(2)}</td></tr>`;
-            });
-
-            const meta = SCENARIO_META[scenarioKey] || { name: scenarioKey, description: '' };
-
-            document.getElementById('stressResults').innerHTML = `
-            <div class="glass" style="padding:1.5rem;">
-                <h3>${data.scenario.name}</h3>
-                <p class="scenario-desc">${data.scenario.description} | market ${data.scenario.market_drop_pct}%</p>
-                <div class="metrics-grid">
-                    <div class="metric-item">original: ₹${impact.original_value}</div>
-                    <div class="metric-item">stressed: ₹${impact.stressed_value}</div>
-                    <div class="metric-item ${lossClass}">${lossSign}: ₹${impact.total_loss_dollar} (${impact.total_loss_pct}%)</div>
+    try {
+        const result = await callApi("/api/scenario/stress-test", { holdings: h, scenario });
+        
+        const impact = result.portfolio_impact || {};
+        let html = `
+            <div class="metrics-grid">
+                <div class="metric-item">
+                    <div class="metric-label">Original Value</div>
+                    <div class="metric-value">₹${impact.original_value?.toLocaleString() || 0}</div>
                 </div>
-                <h4 style="margin-top:20px;">per‑asset impact</h4>
-                <table>
-                    <tr><th>Ticker</th><th>Beta</th><th>Shock %</th><th>Rupees impact</th></tr>
-                    ${assetRows}
-                </table>
-                <p style="margin-top:15px; color:#9f7afe;">${meta.description}</p>
+                <div class="metric-item">
+                    <div class="metric-label">Stressed Value</div>
+                    <div class="metric-value negative">₹${impact.stressed_value?.toLocaleString() || 0}</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-label">Total Loss</div>
+                    <div class="metric-value negative">₹${Math.abs(impact.total_loss_dollar || 0)} (${impact.total_loss_pct}%)</div>
+                </div>
             </div>
+            <h3 style="margin-top: 2rem;">Asset Impacts</h3>
+            <table>
+                <tr><th>Ticker</th><th>Weight</th><th>Beta</th><th>Shock %</th><th>Dollar Impact</th></tr>
         `;
-        }
 
-        // Tab switching
-        function switchTab(tabId) {
-            document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
-            document.getElementById(tabId).style.display = 'block';
-            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-            document.querySelector(`.tab[data-tab="${tabId}"]`).classList.add('active');
+        (result.asset_impacts || []).forEach(a => {
+            html += `<tr><td>${a.ticker}</td><td>${(a.weight * 100).toFixed(1)}%</td><td>${a.beta}</td><td>${a.estimated_shock_pct}%</td><td class="negative">₹${Math.abs(a.dollar_impact)}</td></tr>`;
+        });
+        html += `</table>`;
 
-            // Load data when switching to certain tabs
-            if (tabId === 'scenario') {
-                renderShockInputs();
-            }
-            if (tabId === 'correlation' && holdings.length) {
-                callApi('/api/risk/correlation', { holdings }).then(renderCorrelation).catch(showMessage);
-            }
-        }
+        document.getElementById("stressResults").innerHTML = html;
+        showMessage("✅ Stress test complete", false);
+    } catch (e) {
+        showMessage(e.message);
+    }
+    }
 
-        // Expose functions to global
-        window.addTickerRow = addTickerRow;
-        window.removeRow = removeRow;
-        window.validateTickers = validateTickers;
-        window.loadFullAnalysis = loadFullAnalysis;
-        window.switchTab = switchTab;
-        window.runMonteCarlo = runMonteCarlo;
-        window.runShockAnalysis = runShockAnalysis;
-        window.runStressTest = runStressTest;
+    /* ================= TAB SWITCH ================= */
+    function switchTab(tabId) {
+    document.querySelectorAll(".tab-content").forEach(el => el.style.display = "none");
+    document.getElementById(tabId).style.display = "block";
+    document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+    document.querySelector(`.tab[data-tab="${tabId}"]`).classList.add("active");
+    }
+
+    /* ================= EXPOSE ================= */
+    window.addTickerRow = addTickerRow;
+    window.removeRow = removeRow;
+    window.validateTickers = validateTickers;
+    window.loadFullAnalysis = loadFullAnalysis;
+    window.switchTab = switchTab;
+    window.runMonteCarlo = runMonteCarlo;
+    window.runShockAnalysis = runShockAnalysis;
+    window.runStressTest = runStressTest;
+    window.initShockInputs = initShockInputs;
+    window.initScenariosDropdown = initScenariosDropdown;
+    window.updateLiveMarquee = updateLiveMarquee;
+    window.checkApiConnection = checkApiConnection;
+
     </script>
+   
 </body>
 
 </html>

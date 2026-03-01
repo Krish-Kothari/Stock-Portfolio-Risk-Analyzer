@@ -4,6 +4,7 @@ Stock Portfolio Risk Analyzer — Flask Application Entry Point
 
 from flask import Flask, jsonify, render_template
 from flask_cors import CORS
+import os
 
 from routes.portfolio import portfolio_bp
 from routes.risk import risk_bp
@@ -13,7 +14,26 @@ from routes.scenario import scenario_bp
 
 def create_app() -> Flask:
     app = Flask(__name__)
-    CORS(app)  # allow cross-origin from any frontend
+    
+    # Configure CORS for production and development
+    cors_origins = [
+        "http://localhost:3000",           # Local dev
+        "http://localhost:5173",           # Vite dev
+        "http://127.0.0.1:5173",           # Vite dev
+        "http://127.0.0.1:5000",           # Local Flask
+        "http://localhost:5000",           # Local Flask
+        os.environ.get('FRONTEND_URL', ''), # Vercel frontend URL
+        "https://*.vercel.app",            # Vercel deployments
+    ]
+    
+    # Filter out empty strings
+    cors_origins = [origin for origin in cors_origins if origin]
+    
+    CORS(app, 
+         origins=cors_origins if any(os.environ.get(k) for k in ['FRONTEND_URL']) else None,
+         allow_headers=['Content-Type', 'Authorization'],
+         methods=['GET', 'POST', 'OPTIONS', 'PUT', 'DELETE'],
+         supports_credentials=True)
 
     # --- Register blueprints ---
     app.register_blueprint(portfolio_bp)
